@@ -734,7 +734,7 @@ class Socket < BasicSocket
     end
   end
 
-  def self.tcp_with_fast_fallback(host, port, local_host = nil, local_port = nil, connect_timeout: nil, resolv_timeout: nil)
+  def self.tcp_with_fast_fallback(host, port, local_host = nil, local_port = nil, connect_timeout: nil, resolv_timeout: nil, test_mode_settings: nil)
     if local_host || local_port
       local_addrinfos = Addrinfo.getaddrinfo(local_host, local_port, nil, :STREAM, timeout: resolv_timeout)
       resolving_family_names = local_addrinfos.map { |lai| ADDRESS_FAMILIES.key(lai.afamily) }.uniq
@@ -768,7 +768,7 @@ class Socket < BasicSocket
 
       hostname_resolution_threads.concat(
         resolving_family_names.map { |family|
-          thread_args = [family, host, port, hostname_resolution_result]
+          thread_args = [family, host, port, hostname_resolution_result, test_mode_settings]
           thread = Thread.new(*thread_args) { |*thread_args| resolve_hostname(*thread_args) }
           Thread.pass
           thread
@@ -1016,8 +1016,16 @@ class Socket < BasicSocket
   end
   private_class_method :ip_address?
 
-  def self.resolve_hostname(family, host, port, hostname_resolution_result)
+  def self.resolve_hostname(family, host, port, hostname_resolution_result, test_mode_settings = nil)
     begin
+      if test_mode_settings
+        if (delays = test_mode_settings[:delay]) && (delay = delays[family])
+          sleep(delay / 1000.0)
+        end
+        if (errors = test_mode_settings[:error]) && (error = errors[family])
+          raise Socket::ResolutionError.new("Test mode #{family} error", error)
+        end
+      end
       resolved_addrinfos = Addrinfo.getaddrinfo(host, port, ADDRESS_FAMILIES[family], :STREAM)
       hostname_resolution_result.add(family, resolved_addrinfos)
     rescue => e

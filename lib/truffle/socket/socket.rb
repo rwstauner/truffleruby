@@ -306,12 +306,14 @@ class Socket < BasicSocket
 
     class << self
       alias_method :sockaddr_un, :pack_sockaddr_un
-
-      attr_accessor :tcp_fast_fallback
     end
-
-    @tcp_fast_fallback = ENV['RUBY_TCP_NO_FAST_FALLBACK'] == '0'
   end
+
+  class << self
+    attr_accessor :tcp_fast_fallback
+  end
+
+  @tcp_fast_fallback = (ENV.fetch('RUBY_TCP_NO_FAST_FALLBACK', '0') == '0')
 
   def initialize(family, socket_type, protocol = 0)
     @no_reverse_lookup = Primitive.class(self).do_not_reverse_lookup
